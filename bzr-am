@@ -1,0 +1,36 @@
+#!/bin/sh
+
+# Depends: bzr, git, procmail
+# (uses formail from procmail)
+
+set -e
+
+status=`bzr status -S`
+if [ "$status" != "" ]; then
+	echo `basename "$0"`: "working directory is not clean; aborting" >&2
+	exit 1
+fi
+
+tempdir=`mktemp -d`
+cleanup() { rm -Rf "$tempdir"; }
+trap cleanup EXIT TERM INT
+
+mkdir "$tempdir/patches"
+git mailsplit -o"$tempdir/patches" "$@" >/dev/null
+
+for patch in "$tempdir"/patches/*; do
+	git mailinfo "$tempdir/msg" "$tempdir/patch" < "$patch" > "$tempdir/header"
+	subject=`formail -zcx subject < "$tempdir/header"`
+	author=`formail -zcx author < "$tempdir/header"`
+	email=`formail -zcx email < "$tempdir/header"`
+	echo "Applying $subject"
+	git apply "$tempdir/patch"
+	echo "$subject" > "$tempdir/msg.bzr"
+	if [ -s "$tempdir/msg" ]; then
+		echo >> "$tempdir/msg.bzr"
+		cat "$tempdir/msg" >> "$tempdir/msg.bzr"
+	fi
+	bzr add
+	bzr remove
+	bzr commit -q --strict -F "$tempdir/msg.bzr" --author="$author <$email>"
+done
