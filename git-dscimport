@@ -1,0 +1,47 @@
+#!/bin/sh
+set -e
+
+dsc_file=`readlink -f "$1"`
+
+if ! [ -d .git -o \( "$GIT_WORK_TREE" != "" -a "`readlink -f "$GIT_WORK_TREE"`" = "`readlink -f .`" \) ]; then
+	echo "$0: must be run from the top level of your git work tree." >&2
+	exit 2
+fi
+
+if [ "`git status --porcelain`" != "" ]; then
+	echo "$0: work tree must be clean to continue." >&2
+	exit 2
+fi
+
+tmpdir=`mktemp --tmpdir -d git-dscimport.XXXXXXXXXX`
+cleanup() { rm -Rf "$tmpdir"; }
+trap cleanup EXIT
+
+(cd "$tmpdir" && dpkg-source -x "$dsc_file" > /dev/null)
+extracted_dir=`find "$tmpdir" -mindepth 1 -maxdepth 1 -type d`
+debian_version=`cd "$extracted_dir" && dpkg-parsechangelog --count 1|grep-dctrl -nsVersion .`
+if [ "`git tag -l "$debian_version"`" != "" ]; then
+	echo "Version $debian_version is already tagged." >&2
+	exit 1
+fi
+cat > "$tmpdir/commit_msg" <<EOT
+Import version $debian_version
+
+Imported using git-dscimport.
+EOT
+cat > "$tmpdir/tag_msg" <<EOT
+Tagged using git-dscimport.
+EOT
+if [ -r "$extracted_dir/debian/source/format" -a "`cat "$extracted_dir/debian/source/format"`" = "3.0 (quilt)" ]; then
+	(cd "$extracted_dir" && QUILT_PATCHES=debian/patches QUILT_REFRESH_ARGS="-p ab --no-timestamps --no-index" quilt pop -a)
+	rm -Rf "$extracted_dir"/.pc
+fi
+GIT_WORK_TREE="$extracted_dir" git add -fA
+if [ "`GIT_WORK_TREE="$extracted_dir" git status --porcelain`" = "" ]; then
+	echo "No changes to import." >&2
+	exit 1
+fi
+git commit -F "$tmpdir/commit_msg"
+git tag -a -F "$tmpdir/tag_msg" "$debian_version"
+git reset --hard
+git clean -fxd
