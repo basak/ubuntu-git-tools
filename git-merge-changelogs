@@ -1,0 +1,23 @@
+#!/bin/sh
+set -e
+
+branch_base="$1"
+branch_a="$2"
+branch_b="$3"
+
+if [ ! -d debian ]; then
+    echo "$1: must be run from the top level of an unpacked Debian source package." >&2
+    exit 2
+fi
+
+file_base=`mktemp git-mergechangelogs.XXXXXXXXXX`
+file_a=`mktemp git-mergechangelogs.XXXXXXXXXX`
+file_b=`mktemp git-mergechangelogs.XXXXXXXXXX`
+cleanup() { rm -f "$file_base" "$file_a" "$file_b"; }
+trap cleanup EXIT
+
+filename=changelog
+git show "${branch_base}:debian/$filename" > "$file_base"
+git show "${branch_a}:debian/$filename" > "$file_a"
+git show "${branch_b}:debian/$filename" > "$file_b"
+dpkg-mergechangelogs "$file_base" "$file_a" "$file_b" > debian/$filename
