@@ -1,0 +1,17 @@
+#!/bin/sh
+set -e
+
+tempfile=`mktemp --tmpdir git-reconstruct-changelog.XXXXXXXXXX`
+cleanup() { rm -f "$tempfile"; }
+trap cleanup EXIT
+
+dch PLACEHOLDER
+sed -n '1,/PLACEHOLDER/{/PLACEHOLDER/!p}' debian/changelog > "$tempfile"
+for rev in `git rev-list --reverse $1..HEAD`; do
+	if [ "`git diff --name-only $rev^ $rev`" = debian/changelog ]; then
+		continue
+	fi
+	git log --pretty=%B -n1 $rev|sed '/^$/d' >> "$tempfile"
+done
+sed -n '1,/PLACEHOLDER/!p' debian/changelog >> "$tempfile"
+mv "$tempfile" debian/changelog
