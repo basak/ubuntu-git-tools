@@ -32,7 +32,7 @@ EOT
 cat > "$tmpdir/tag_msg" <<EOT
 Tagged using git-dscimport.
 EOT
-if [ -r "$extracted_dir/debian/source/format" -a "`cat "$extracted_dir/debian/source/format"`" = "3.0 (quilt)" ]; then
+if [ -r "$extracted_dir/debian/source/format" -a "`cat "$extracted_dir/debian/source/format"`" = "3.0 (quilt)" -a -f "$extracted_dir/debian/patches/series" ]; then
 	(cd "$extracted_dir" && QUILT_PATCHES=debian/patches QUILT_REFRESH_ARGS="-p ab --no-timestamps --no-index" quilt pop -a)
 	rm -Rf "$extracted_dir"/.pc
 fi
