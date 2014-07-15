@@ -20,6 +20,7 @@ trap cleanup EXIT
 (cd "$tmpdir" && dpkg-source -x "$dsc_file" > /dev/null)
 extracted_dir=`find "$tmpdir" -mindepth 1 -maxdepth 1 -type d`
 debian_version=`cd "$extracted_dir" && dpkg-parsechangelog --count 1|grep-dctrl -nsVersion .`
+debian_version_tag=`echo "$debian_version"|sed 's/:/_/g'`
 if [ "`git tag -l "$debian_version"`" != "" ]; then
 	echo "Version $debian_version is already tagged." >&2
 	exit 1
@@ -42,6 +43,6 @@ if [ "`GIT_WORK_TREE="$extracted_dir" git status --porcelain`" = "" ]; then
 	exit 1
 fi
 git commit -F "$tmpdir/commit_msg"
-git tag -a -F "$tmpdir/tag_msg" "$debian_version"
+git tag -a -F "$tmpdir/tag_msg" "$debian_version_tag"
 git reset --hard
 git clean -fxd
