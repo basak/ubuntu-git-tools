@@ -3,8 +3,9 @@ set -e
 
 dsc_file=`readlink -f "$1"`
 
-if ! [ -d .git -o \( "$GIT_WORK_TREE" != "" -a "`readlink -f "$GIT_WORK_TREE"`" = "`readlink -f .`" \) ]; then
+if ! [ -d .git -o "$GIT_WORK_TREE" != "" ]; then
 	echo "$0: must be run from the top level of your git work tree." >&2
+	echo "$0: alternatively, set GIT_WORK_TREE." >&2
 	exit 2
 fi
 
