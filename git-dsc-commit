@@ -22,8 +22,8 @@ trap cleanup EXIT
 extracted_dir=`find "$tmpdir" -mindepth 1 -maxdepth 1 -type d`
 debian_version=`cd "$extracted_dir" && dpkg-parsechangelog --count 1|grep-dctrl -nsVersion .`
 debian_version_tag=`echo "$debian_version"|sed 's/:/_/g;s/~/_/g'`
-if [ "`git tag -l "$debian_version"`" != "" ]; then
-	echo "Version $debian_version is already tagged." >&2
+if [ "`git tag -l "$debian_version_tag"`" != "" ]; then
+	echo "Version $debian_version_tag is already tagged." >&2
 	exit 1
 fi
 cat > "$tmpdir/commit_msg" <<EOT
