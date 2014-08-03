@@ -13,7 +13,7 @@ if [ "`git status --porcelain`" != "" ]; then
 	exit 2
 fi
 
-tmpdir=`mktemp --tmpdir -d git-dscimport.XXXXXXXXXX`
+tmpdir=`mktemp --tmpdir -d git-dsc-commit.XXXXXXXXXX`
 cleanup() { rm -Rf "$tmpdir"; }
 trap cleanup EXIT
 
@@ -28,10 +28,10 @@ fi
 cat > "$tmpdir/commit_msg" <<EOT
 Import version $debian_version
 
-Imported using git-dscimport.
+Imported using git-dsc-commit.
 EOT
 cat > "$tmpdir/tag_msg" <<EOT
-Tagged using git-dscimport.
+Tagged using git-dsc-commit.
 EOT
 if [ -r "$extracted_dir/debian/source/format" -a "`cat "$extracted_dir/debian/source/format"`" = "3.0 (quilt)" -a -f "$extracted_dir/debian/patches/series" ]; then
 	(cd "$extracted_dir" && QUILT_PATCHES=debian/patches QUILT_REFRESH_ARGS="-p ab --no-timestamps --no-index" quilt pop -a)
