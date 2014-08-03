@@ -18,7 +18,7 @@ tmpdir=`mktemp --tmpdir -d git-dsc-commit.XXXXXXXXXX`
 cleanup() { rm -Rf "$tmpdir"; }
 trap cleanup EXIT
 
-(cd "$tmpdir" && dpkg-source -x "$dsc_file" > /dev/null)
+(cd "$tmpdir" && dpkg-source -x --skip-patches "$dsc_file" > /dev/null)
 extracted_dir=`find "$tmpdir" -mindepth 1 -maxdepth 1 -type d`
 debian_version=`cd "$extracted_dir" && dpkg-parsechangelog --count 1|grep-dctrl -nsVersion .`
 debian_version_tag=`echo "$debian_version"|sed 's/:/_/g;s/~/_/g'`
@@ -34,10 +34,6 @@ EOT
 cat > "$tmpdir/tag_msg" <<EOT
 Tagged using git-dsc-commit.
 EOT
-if [ -r "$extracted_dir/debian/source/format" -a "`cat "$extracted_dir/debian/source/format"`" = "3.0 (quilt)" -a -f "$extracted_dir/debian/patches/series" ]; then
-	(cd "$extracted_dir" && QUILT_PATCHES=debian/patches QUILT_REFRESH_ARGS="-p ab --no-timestamps --no-index" quilt pop -a)
-	rm -Rf "$extracted_dir"/.pc
-fi
 GIT_WORK_TREE="$extracted_dir" git add -fA
 if [ "`GIT_WORK_TREE="$extracted_dir" git status --porcelain`" = "" ]; then
 	echo "No changes to import." >&2
