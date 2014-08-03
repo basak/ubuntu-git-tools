@@ -43,7 +43,7 @@ if [ "`GIT_WORK_TREE="$extracted_dir" git status --porcelain`" = "" ]; then
 	echo "No changes to import." >&2
 	exit 1
 fi
-git commit -F "$tmpdir/commit_msg"
+git commit -qF "$tmpdir/commit_msg"
 git tag -a -F "$tmpdir/tag_msg" "$debian_version_tag"
 git reset --hard
 git clean -fxd
