@@ -1,17 +1,445 @@
-All files in this repository are licensed as follows. If you contribute
-to this repository, it is assumed that you license your contribution
-under the same license unless you state otherwise.
+From robie.basak@ubuntu.com Mon Aug  4 17:17:45 2014
+Date: Mon, 4 Aug 2014 17:17:45 +0100
+From: Robie Basak <robie.basak@ubuntu.com>
+To: ubuntu-devel@lists.ubuntu.com
+Subject: My git-based Ubuntu package merge workflow
+Message-ID: <20140804161745.GF9731@mal.justgohome.co.uk>
+MIME-Version: 1.0
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="9l24NVCWtSuIVIod"
+Content-Disposition: inline
+Status: RO
+Content-Length: 19676
+Lines: 430
 
-Copyright (C) 2014 Canonical Ltd.
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, version 3 of the License.
+--9l24NVCWtSuIVIod
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+I thought it was about time that I shared my own merge workflow, as I
+think it is quite different from most other Ubuntu developers. I'm an
+advanced git user (even a fanatic, perhaps), and I make extensive use of
+git's interactive rebase feature. To me, an Ubuntu package merge is just
+a rebase in git's terminology, and in this case I use git as nothing
+more than an advanced patchset manager.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+I find my workflow allows me to handle arbitrarily complex package
+merges - something I've not been able to do any other way. And once I've
+merged a particular package with this workflow once, future merges take
+me far less time because checking individual broken down diffs is even
+quicker still.
+
+This workflow may be useful to others, but probably only if you are
+already very familiar with git's interactive rebase feature. I don't
+suggest that you try to use this workflow without first being
+extremely comfortable with this (for example, working with git while not
+attached to a branch).
+
+On the other hand, if you are very familiar with rebasing in git, then
+like me you may find this workflow to be the logically obvious way of
+doing package merges in Ubuntu. I wonder if anybody else feels like
+this.
+
+In my mind, this write-up may seem complex, but I think this complexity
+is just a reflection of the reality of what's really going on when one
+does an Ubuntu package merge. But by using git, the complexity gets
+moved to the complexity of doing git rebases, and this is something that
+only needs to be learnt once.
+
+I'm also interested to know how this fits in with other recent work in
+using git with Debian packaging. My impression is that it doesn't fit so
+well, because in Ubuntu we need to deal with all Debian packages,
+including those not managed in git in Debian. Comments, feedback and
+criticism are all appreciated.
+
+# Considering merges
+
+## Merge essentials
+
+Let's me first consider what an Ubuntu package merge really is. Existing
+Ubuntu developers probably want to skip this section.
+
+First, some terminology. For a given package that needs merging, Ubuntu
+has applied some set of changes from the Debian version it is based on.
+So we have some Debian version from which Ubuntu diverged (the base
+version), the latest Debian version, and the current Ubuntu version. The
+old Ubuntu delta is the diff between the base version and the current
+Ubuntu version. The new Ubuntu delta will be the diff between the latest
+Debian version and the newest Ubuntu version that we will upload.
+
+To do a package merge, we must re-apply all of the Ubuntu delta that is
+still required onto the latest Debian version. On the way, we might find
+that some changes are no longer required, some changes that have to be
+modified to work against the latest Debian version, and may perhaps need
+to introduce new changes.
+
+We expect the result to contain a changelog entry summarising what
+remains in the Ubuntu delta, what was modified or dropped, and any new
+changes that were made.
+
+## The logical delta
+
+So when doing a package merge, it is essential to understand what
+exactly logically constituted the previous Ubuntu delta, so that we can
+identify what changes are no longer required, how we might need to
+modify some previous changes, and what new changes may be needed.
+
+When the Ubuntu delta is relatively trivial, checking all of this
+by examining the diffs produced by merge-o-matic is normally fine. Even
+if the delta consists of a few changes, they are easy to identify and
+understand in a small diff.
+
+But when the delta is larger, I find it far more difficult to follow it
+all in my head at once, particularly when multiple logical changes apply
+changes to similar overlapping areas across multiple files. This is, of
+course, yet another good reason why we should be sending our changes to
+Debian and keeping our delta small, but in some cases this maintaining a
+large delta is necessary, at least in the short term.
+
+In following my workflow, I have come across a number of merge errors
+made by multiple Ubuntu developers, where the claimed delta in the
+changelog for a merge did not match the delta itself. This suggests to
+me that developers are not always checking and understanding the delta
+as they should.
+
+# Applying git
+
+git makes it easy to take a large "squashed" diff and split it into
+multiple constituent logical parts. This is what I've been doing here.
+Once split like this, I use `git rebase` to apply the logical parts back
+on to the latest Debian version. This allows me to examine each logical
+part of the delta separately, modifying or removing them as required.
+When I'm done, it is easy to review each part, and even compare against
+the previous version. And I can save the broken down parts for the next
+merge.
+
+So broadly, my workflow for packages with complex deltas is:
+
+1. Import the base, latest Debian and all Ubuntu revisions since the
+base version into a git repository.
+
+2. Break down the Ubuntu revisions into constituent logical parts using
+`git rebase`. Or If I followed this workflow last time, then I just run
+`git am` against what I saved previously. One might consider this step
+to be the opposite of a "squash" operation. "Unsquash", if you like.
+
+3. Rebase onto the latest Debian version, dropping any metadata changes
+(eg. `debian/changelog` changes and `update-maintainer`) and amending
+the delta on the way as required.
+
+4. Update `debian/changelog`, apply `update-maintainer`, review, test
+and upload.
+
+5. Run `git format-patch` to save my set of logical changes for next time.
+
+To help with these tasks, I have written some tooling that I use. I've
+pushed these to `git://github.com/basak/ubuntu-git-tools.git`:
+
+* `xgit` is a wrapper around setting `GIT_WORK_DIR` and `GIT_DIR`, so
+  that I can operate with a `.git` directory that is outside my working
+  tree. This means that `dpkg-buildpackage`, `dpkg-source` etc. don't
+  need to know or care that I'm using git, and I can run git commands
+  without necessarily being in my working tree.
+
+* `git-dsc-commit` imports a source package by just committing and
+  tagging a new commit (in the current branch, or detached HEAD) that is
+  exactly the unpacked source package.
+
+* `git-merge-changelogs` is a wrapper around `dpkg-mergechangelogs` that
+  takes its input changelogs from `debian/changelog` files found in
+  specific git revisions.
+
+* `git-reconstruct-changelog` extracts commit log messages from a set of
+  git commits and writes them to `debian/changelog`.
+
+These tools are incomplete. I didn't know where I was going when I wrote
+them, and there is certainly scope for more automation. I addressed the
+biggest needs first, and what is remaining costs me little time so I
+have not spent time to automate any more yet.
+
+## Importing revisions into a git repository
+
+I generally start with:
+
+    # Import relevant source packages. This could probably be automated
+    # with the help of grab-merge.
+    pull-debian-source -d <package>
+    pull-debian-source -d <package> <base-revision>
+    pull-lp-source -d <package>
+    pull-lp-source -d <package> <version-since-base>  # 0 or more times
+
+    # Set up git repository for this merge
+    . /path/to/xgit.bash
+    xgit
+    mkdir git gitwd  # git =3D moved .git directory; gitwd =3D working dire=
+ctory
+                     # without .git
+    git init
+
+Next I import the sources package into git, modelling the Ubuntu
+divergence by having the new Debian package have a parent commit of the
+base Debian package, and the Ubuntu packages on a separate branch also
+rooted at the base package:
+
+    git dsc-commit <base-revision .dsc>
+    git dsc-commit <latest-debian-version .dsc>
+    git checkout <base-revision tag>
+    git dsc-commit <Ubuntu version since base .dsc>  # 0 or more times
+    git dsc-commit <current Ubuntu version .dsc>
+
+`git-dsc-commit` automatically tags revisions, but since `~` and `:` are
+invalid in git tag names, `_` is substituted. So right now, I have to
+correctly name the tag that `git-dsc-commit` used in the `git checkout`
+call above.
+
+`git-dsc-commit` commits "3.0 (quilt)" source packages without patches
+applied. I prefer to work with quilt patches directly if they need
+refreshing or other changes made. Otherwise I just get noise in `.pc/`,
+and it is difficult to rationalise any changes made back into the
+separate quilt patches they belong to.
+
+Note that `git-dsc-commit` commits the entire source package tree
+exactly as it is. It is not like a normal commit, where logically you're
+committing a change. Underneath, git commits are really snapshots, not
+changesets, so `git-dsc-commit` just commits a snapshot identical to the
+source package. For example, if you have made a change, then
+=66rom your point of view `git-dsc-commit` will effectively commit the
+reverse of that change if necessary so that the result looks identical
+to the source package you're importing.
+
+When this step is done, I have a git repository with imported source
+packages in commits that mirror the Ubuntu divergence.
+
+I find this point very useful in itself, since I can now easily compare
+things. If I want to know if two files specific are different between
+specific Debian and Ubuntu source package versions, or how they are
+different, or want a list of files in a particular `debian/`
+subdirectory that have changed, then I just ask and git will tell me.
+Querying for changes between arbitrary revisions and files is something
+that git does very well.
+
+## Breaking down the delta into logical parts
+
+If I already perfomed this for a previous upload, then a simple `git am`
+against my saved work allows me to skip this step. I can verify the
+result by diffing against the imported squashed equivalent.
+
+I won't go into how to use `git rebase` here; I assume you know that.
+For every commit I edit, I generally `git reset HEAD^` back to the
+previous version, so all changes made in this particular source package
+version become unstaged. Then I go through the changelog entries one by
+one, staging only those changes (often using `git add -p`) and
+committing them one by one.
+
+The point in this step is to reflect what was logically present in an
+already-uploaded source package, errors and all. Some notes:
+
+* I generally aim to end up with commits that follow the same order as
+  the entries in `debian/changelog`.
+
+* `git log --decorate` is useful here, since all the imported source
+  packages are tagged.
+
+* I make the commit message for each logical change identical to its
+  entry in `debian/changelog` where possible, including leading
+  whitespace and the `*`, `-` or `+` bullet points.
+
+* I make the `debian/changelog` file change for the entire upload a
+  separate commit at the end (most recent) for each source package
+  version.
+
+* If `update-maintainer` was run and thus modified `debian/control`, or
+  `VCS-*` entries changed to `XS-Debian-VCS*` entries, I put this in a
+  separate logical commit with an "ubuntu-meta" commit message.
+
+* Quilt patches that exist only in Ubuntu involve logical commits that
+  add the file in `debian/patches/` and add a single line to
+  `debian/patches/series`. Patches remain unapplied. Similarly, for
+  other types of quilt patch modification, only changes to
+  `debian/patches/` end up in the commit.
+
+* This is the stage that I often find errors in the previously
+  documented changelog. Where this happens, I just figure out what
+  happened logically and try and commit something that matches. If
+  `debian/changelog` specified a change that was actually not present,
+  it doesn't get a logical commit, but the commit with the full
+  `debian/changelog` change does include the erroneous text.
+
+When done, it is trivial to run `git log -p` and check that all commits
+match their description. I also run `git diff <tag>` and verify that the
+result is still identical to the source package import we started from
+by checking that the reported diff is empty.
+
+## Rebasing onto the newest Debian version
+
+Again, this should be straightforward to follow for git rebasers, and I
+assume you know how to operate the details.
+
+First, I drop any previous commits that changed `debian/changelog` only,
+as well as any "ubuntu-meta" commits. Then something like `git rebase
+--onto <new_debian_version> <base_version>` does the job. If there are
+conflicts, they can be handled during the rebase in the normal way.
+
+While I'm doing this, I take notes of the changes I made so that I can
+write up the changelog later. Where possible, I directly squash these
+notes into the commit messages in the form of the future changelog
+entry. If the rebase step drops commits because they have been applied
+in Debian, then it's important to note these. git doesn't specifically
+point these out except as they scroll past.
+
+Next, I check that all quilt patches apply and are still correct, and do
+any further editing required. This includes test builds, running dep8
+tests, etc. As I do this, I use `git rebase` extensively again,
+squashing the commits down into their original places and updating
+commit messages (which will be the basis of the future changelog
+message).
+
+When doing test builds at this stage, I don't want to overwrite the
+Debian source package in my parent directory, so I do have to insert a
+temporary changelog entry or something. I haven't worked out a strong
+pattern for this yet; sometimes I complete the remaining steps first to
+avoid this issue, and rebase and squash any changes I needed back in.
+`git-buildpackage` can probably help me here; I haven't looked into
+integrating it into my workflow at this step yet.
+
+It is important to note that this stage really uses git as an advanced
+patchset editor. I am editing the patchset itself. I specifically do not
+add new commits to the end, except temporarily before I squash them down
+again.
+
+When this step is complete, my commits start from the imported latest
+Debian source package version, and show the logical delta (one logical
+entry per commit) that will form the new Ubuntu upload. Changelog
+entries exist only as commit messages; `debian/changelog` is not
+modified at all yet.
+
+## Updating the changelog
+
+Since an Ubuntu merge is expected to include a merged changelog, adding
+to the Debian changelog will not do; we need to import all previous
+Ubuntu changelog entries too.
+
+Most of this could probably be automated more.
+
+### Merging old changelog entries
+
+My tool `git-merge-changelogs` does this. Calling it as `git
+merge-changelogs <base version tag> <latest Debian version tag> <current
+Ubuntu version tag>` fetches the changelog entries out of the imported
+source packages, calls `dpkg-mergechangelogs` and writes out
+`debian/changelog` in the working tree. Then I usually just `git commit
+-mmerge-changelogs debian/changelog` to commit this step.
+
+### Automatically creating new changelog entries
+
+Next, I need to add the changelog entry for the merge itself. I do this
+with my tool `git-reconstruct-changelog`. Calling `git
+reconstruct-changelog <latest Debian version tag>` inserts the commit
+messages into `debian/changelog`. Then I usually run `git commit
+-mreconstruct-changelogs debian/changelog` to commit this step.
+
+### Finishing the changelog
+
+Reconstructing the changelog will miss out the merge introduction, and
+also will fail to mention any dropped changes since there are no commits
+that correspond to these. Consulting my notes from earlier, I edit up
+the changelog manually, fix any whitespace/wrapping issues, release it
+with `dch -r ''` and commit it with `git commit -mchangelog
+debian/changelog`.
+
+## Other metadata
+
+Next I run `update-maintainer`, and then `git commit -mubuntu-meta
+debian/control` to commit this step. Any `VCS-*` to `XS-Debian-VCS-*`
+type translation goes into this commit, too.
+
+## Uploading
+
+That's it. Since my working tree has no `.git` directory, I can just run
+`debuild` as usual to create my source package ready for upload.
+
+If there's a problem and I need to go round again, it's quite easy to
+squash a change in where I need it, re-run `git reconstruct-changelog`
+and edit the changelog, and rebuild the source package.
+
+## Saving the logical delta for future use
+
+After upload, I make sure to save my logical delta by using `git
+format-patch`. This allows me to reconstruct it quickly the next time I
+merge the same package. There is no need for me to keep the git
+repository around.
+
+The patchsets I've saved this way don't always follow what I've written
+here precisely, as I have taken a while to settle on it, and I still
+deviate on a whim. It doesn't really matter though; by separating out
+logical changes into separate commits, when I look at it the next time
+it's easy to mould a patchset into whatever form I will need.
+
+# Example of use
+
+This workflow allows me to handle any merge that is thrown at me,
+however complex it may be. When I merged mysql-5.5 last cycle, it had
+diverged considerably from Debian, but with much cherry-picking going
+both ways. The sheer complexity of it, and the time necessary to figure
+it all out, had put off developers before me from sorting it out.
+Instead, some changes kept getting cherry-picked and other changes were
+getting lost.
+
+When I reconstructed the logical set of changes made in Ubuntu since we
+diverged, I ended up with a branch of around 120 commits (IIRC). With
+extensive rebasing, I ended up reducing this to 8 logical changes to
+send to Debian, and just 4 commits remaining in the Ubuntu delta.
+Importantly, I did this in a way that I could be confident about the
+results, since I could easily verify my work.
+
+I'm now going to do the same for mysql-5.6, and I'm much happier doing
+it knowing that I can manage it this way.
+
+# Future
+
+I have a local store of these logical delta patchsets. Currently this is
+for apache2, facter, nginx, php5, subversion and vsftpd. If others want
+to follow the same workflow, we should work out some way to share them.
+
+And if many people find a git repository that follows Debian and Ubuntu
+source packages useful, then perhaps we should set one of those up to
+share, too, to save doing the import step.
+
+I did have some code that auto-imported into git from UDD bzr, and
+cached, so I could just `git clone` a UDD branch, but this is limited to
+UDD's package import reliability, so I stopped using it. My
+git-dsc-commit tool should always work. I have had to fix a number of
+edge cases, but I am not aware of any that are outstanding.
+
+# The End
+
+What I think I have here are the pieces needed to make merging Ubuntu
+packages with git work. The workflow itself doesn't matter so much - you
+can mix and match, and you should be fine.
+
+--9l24NVCWtSuIVIod
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Description: Digital signature
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iQIcBAEBCgAGBQJT37IpAAoJEOVkucJ1vdUuq4UQAKeco25ptcRlPJLYnEDR3AnR
+QUaIwH9f6i27TU1qG898LOm1WauMau743YoDuAM75QgVBRkWzy1o3tGVMdFjNhQ0
+qPgatmd7ZkjK8U+BtS7ijkA16IXBZWmlc1KX0OjnbdKrFuZ84vNopd/i1M/TP07a
+vFRrI/U59rMU93ok629/tg+bwfmEJd7SoAy/rnnK+1D3TeRZZ0nadpwNGT5+aQGQ
+4YgXEekESYSdLKxY+DK60BsKMVKI+2OgBn5a4onH5FDo6cRIo/ChAIIq9AzAusOs
+HsZ5kk+7HzFmkboFXg5Jm0zOr+/qXKAgq9AUACqa5GqMhaQc136kPEclfY11y0UD
+qP+bgNN+dOmpcvGjoZVcaFxh6QZiA9ueF15yb3qX4FUfRD6gGmxxh8WuYNmuZu8z
+XVKnwZuc9vtJX2tnhn/BACcNVn+fHjqUyzeJaqqMenc0Xv9B4xLVDrIuk1OglvQ5
+c6Z7gtpLlWAJ6qYAx0ot4o6fv5NWVm7g0QiVq3GNai2PmjnPjOZmRRVOBp7TUMxE
+jYzPFDMvuVo4Q7FaUNr/nnlWSBVacwN+IpTS8jaR6Oit2Jas1jPqYOlWtNAWXSTD
+wkgXDwoLuE1JBCBGoqsPMjQjXpLuG7Tc3YmmPIRXbP87E7IREzPGbzdVCoDqkWxM
+/3gvJUoQ6ebB6Q2KR6iz
+=1N+r
+-----END PGP SIGNATURE-----
+
+--9l24NVCWtSuIVIod--
+
