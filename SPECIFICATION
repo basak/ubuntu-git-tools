@@ -1,0 +1,146 @@
+Specification
+
+git URL shortcuts used (add these to ~/.gitconfig or expand them
+manually yourself):
+
+[url "git+ssh://<LPID>@git.launchpad.net/~ubuntu-server-dev/ubuntu/+source/"]
+    insteadof = lpusdp:
+[url "git+ssh://<LPID>@git.launchpad.net/~<LPID>/ubuntu/+source/"]
+    insteadof = lpmep:
+
+Definitions: "old debian", "old ubuntu", "new debian", "new ubuntu" are
+as understood. Make sure that "old debian" is really the last common
+ancestor of "old ubuntu" and "new debian". Determining this is
+especially prone to error if Ubuntu imported new upstream versions since
+it diverged from Debian. If this is wrong, then pain will result.
+
+By "merge" we always mean an "Ubuntu merge", which is in git terms
+really a rebase. No actual git merge takes place in this entire
+workflow.
+
+Common git references expected (T for tag, B for branch):
+
+Things that will be imported by a sponsor or the importer (available
+from: lpusdp:<package>; ask a sponsor if missing):
+
+* T import/<version> and T upload/<version>
+  * Logically this is the tree corresponding to a particular tag;
+    history is secondary.
+  * The tree is identical to corresponding source package version in the
+    archive.
+  * For T import/<version>: imported from the archive and pushed to
+    ~ubuntu-server-dev as an authoritative source.
+  * For T upload/<version>: pushed to ~ubuntu-server-dev by an uploader
+    to record exactly what was uploaded.
+  * Pushing to ~ubuntu-server-dev is restricted to uploaders.
+  * The parent commit should be the previous version import or upload
+    tag where available. An orphan commit is acceptable in the
+    exceptional case that this is not possible.
+
+* B ubuntu/devel
+  * Logically this is our moving reference for what is currently in the
+    Ubuntu development release.
+  * In ~ubuntu-server-dev, this must always point to something also
+    tagged as import/<version> or upload/<version>.
+  * Pushing to ~ubuntu-server-dev is restricted to uploaders.
+  * This branch will be rebased to new Debian imports during Ubuntu
+    "merges" (but tags will be left behind).
+
+Things that should be made available to a sponsor when submitting a
+merge for upload (push to: lpmep:<package>):
+
+* T logical/<old ubuntu>
+  * Logically, this is a patchset
+    ({import,upload}/<old debian>..logical/<old ubuntu>).
+  * Breakdown of previous Ubuntu delta.
+  * Must be based on an official import/<old debian> or upload/<old debian>
+    tag ("official" means from ~ubuntu-server-dev).
+  * One commit per logical change over the entire Ubuntu delta.
+  * Churn squashed.
+  * No upstream changes (so only changes in debian/*).
+  * No changes to debian/changelog.
+  * No "update-maintainer" or "Vcs-*" or other meta changes.
+  * To get to this, you will probably start from reconstruct/<old ubuntu>,
+    described below.
+  * Sanity checks:
+    - Identical to the corresponding import/<version> except for:
+      + debian/changelog, which should be unchanged.
+      + Meta changes (update-maintainer, Vcs-*) in debian/control.
+      + Anything not in debian/*, which should be unchanged
+	(exceptionally this happens when new upstream versions were
+	imported ahead of Debian).
+    - No line should be touched twice, except where separate logical
+      changes need to touch the same line.
+  * Providing this makes it easy for the sponsor to check a proposed
+    merge:
+    1. Check correctness of this tag against the previous Ubuntu delta
+       (perform the above sanity checks and use "git log -p" to make
+       sure each logical commit describes only its own changes).
+    2. Ensure that every commit here is accounted for in the proposed
+       merge.
+
+* B merge
+  * Proposed merge for upload.
+  * Based on import/<new debian> or upload/<new debian>.
+  * One commit per logical change; no changes to debian/changelog in
+    those commits.
+  * One commit for each of merge-changelogs, reconstruct-changelog, any
+    changelog tweaks and ubuntu-meta (or update-maintainer as you wish).
+  * debian/changelog should be "released" with the version string
+    matching the proposed upload version and targeting the correct
+    pocket.
+  * Add commits to the end of this branch in response to reviewer
+    comments.
+  * If agreed with your sponsor that for the changes requested a new
+    rebased merge branch will be easier to manage than adding commits to
+    the end, then do this instead. Rebase the original "merge" branch.
+    To keep history, if you wish tag the old one "merge.v1". You may
+    also rebase like this as you wish during preparation before
+    presenting this branch for review.
+
+Things you may want to make available to reviewers so that they can
+check your process (push to: lpmep:<package>), for which we have
+standardised names:
+
+* T reconstruct/<old ubuntu>
+  * Logically, this is a patchset
+    ({import,upload}/<old debian>..reconstruct/<old ubuntu>).
+  * Based on import/<old debian>. For each Ubuntu upload since then:
+    * One commit to pull in a new upstream if there is one (rare). This
+      must not contain any changes to debian/.
+    * One commit per logical change.
+    * One commit for changelog.
+    * One commit for any ubuntu-meta/update-maintainer change (usually
+      only in merge uploads).
+  * Drop non-logical commits from this tip and rebase to squash and
+    split to derive the logical/<old ubuntu> tag.
+
+* T merge.v1, merge.v2, etc.
+  * The old state of each merge branch before you rebased it. Only
+    useful if you rebased during your merge. If done after your initial
+    review request, please only do this with agreement of your sponsor,
+    since it causes your sponsor more review time.
+
+Merge proposal to make in Launchpad:
+
+lpmep:<package> merge → lpusdp:<package> ubuntu/devel
+
+After review:
+
+If adding commits in response to reveiwer comments, just push again to
+lpmep:<package> merge.
+
+If (exceptionally) rebasing in response to reviewer comments:
+  1. Tag the old branch "merge.v1" (or v2, v3 etc. for future iterations)
+  2. Rebase the "merge" branch as required
+  3. Push to lpmep:<package>:
+     a) The new "v" tag from above.
+     b) The merge branch (force will be required).
+
+To upload a reviewed merge (for the sponsor):
+
+1. Upload using dput as usual.
+2. Tag the merge branch "upload/<version>" (replace ':' and '~' with '_'
+   to meet git's naming requirements). A lightweight tag is fine.
+3. Force push the merge branch to lpusdp:<package> ubuntu/devel.
+4. Push the "upload/<version>" tag to lpusdp:<package>.
