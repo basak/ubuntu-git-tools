@@ -18,6 +18,10 @@ By "merge" we always mean an "Ubuntu merge", which is in git terms
 really a rebase. No actual git merge takes place in this entire
 workflow.
 
+No trees in this workflow ever have quilt patches applied. All commits
+are with quilt fully popped and no .pc directory. Changes to quilt
+patches are seen in debian/patches/* only.
+
 Common git references expected (T for tag, B for branch):
 
 Things that will be imported by a sponsor or the importer (available
