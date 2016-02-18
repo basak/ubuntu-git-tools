@@ -1,0 +1,39 @@
+Here's an example of importing by hand, for quick copy and paste (as error
+prone as that is). This logic can form the basis of an automatic importer.
+
+P=hello  # change to match your package
+
+mkdir $P
+cd $P
+mkdir git gitwd
+xgit
+git init
+echo '* -text' > git/info/attributes  # needed to prevent CRLF mangling; see src:bouncycastle 1.51-4
+git remote add lpusdp lpusdp:$P
+pull-debian-source -d $P
+pull-lp-source $P
+less ${P}*/debian/changelog
+
+pull-debian-source -d $P ...  # base Debian revision
+pull-lp-source -d $P ...  # intermediate Ubuntu revisions
+
+ls *.dsc
+
+git-dsc-commit ... # Debian revisions
+
+git branch -m master debian/sid
+
+git checkout ...  # Base Debian revision
+ls *.dsc
+
+git-dsc-commit ... # Ubuntu revisions
+
+git branch ubuntu/devel
+cd git/refs/tags  # hack; should have git-dsc-commit --prefix=import/
+mkdir import
+mv * import
+cd -
+git push lpusdp \*
+xgit
+cd ..
+
