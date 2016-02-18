@@ -141,10 +141,28 @@ If (exceptionally) rebasing in response to reviewer comments:
      a) The new "v" tag from above.
      b) The merge branch (force will be required).
 
+For "traditional" sponsors:
+
+git can easily generate the traditional debdiffs that you normally
+review. Assuming you have appropriate remote tracking branches:
+
+  * For Ubuntu → Ubuntu, "git diff lpusdp/ubuntu/devel sponsoree/merge"
+  * For Debian → Ubuntu, "git diff lpusdp/debian/sid sponsoree/merge"
+
+Or you can ask the sponsoree to generate these for you.
+
 To upload a reviewed merge (for the sponsor):
+
+(Sponsors: you can just ignore these instructions and upload the
+traditional way if you like. But sponsorees cannot push to our VCS and
+you can, so it would be nice if you could push this please, so a future
+merger doesn't have to reconstruct the lost information).
 
 1. Upload using dput as usual.
 2. Tag the merge branch "upload/<version>" (replace ':' and '~' with '_'
-   to meet git's naming requirements). A lightweight tag is fine.
+   to meet git's naming requirements). A lightweight tag is fine, or
+   go ahead and annotate if you want to include any extra notes.
 3. Force push the merge branch to lpusdp:<package> ubuntu/devel.
 4. Push the "upload/<version>" tag to lpusdp:<package>.
+
+lpusdp: is: git+ssh://<LPID>@git.launchpad.net/~ubuntu-server-dev/ubuntu/+source/
