@@ -1,7 +1,13 @@
 #!/bin/sh
 set -e
 
-dsc_file=`readlink -f "$1"`
+TREEONLY=false
+if [ "$1" = "--tree-only" ]; then
+	TREEONLY=true
+	dsc_file=`readlink -f "$2"`
+else
+	dsc_file=`readlink -f "$1"`
+fi
 
 if ! [ -d .git -o "$GIT_WORK_TREE" != "" ]; then
 	echo "$0: must be run from the top level of your git work tree." >&2
@@ -10,7 +16,7 @@ if ! [ -d .git -o "$GIT_WORK_TREE" != "" ]; then
 fi
 
 if [ "`git status --porcelain`" != "" ]; then
-	echo "$0: work tree must be clean to continue." >&2
+	echo "$0: working tree must be clean to continue." >&2
 	exit 2
 fi
 
@@ -20,26 +26,35 @@ trap cleanup EXIT
 
 (cd "$tmpdir" && dpkg-source -x --skip-patches "$dsc_file" > /dev/null)
 extracted_dir=`find "$tmpdir" -mindepth 1 -maxdepth 1 -type d`
-debian_version=`cd "$extracted_dir" && dpkg-parsechangelog --count 1|grep-dctrl -nsVersion .`
-debian_version_tag=`echo "$debian_version"|sed 's/:/_/g;s/~/_/g'`
-if [ "`git tag -l "$debian_version_tag"`" != "" ]; then
-	echo "Version $debian_version_tag is already tagged." >&2
-	exit 1
-fi
-cat > "$tmpdir/commit_msg" <<EOT
-Import version $debian_version
+if ! $TREEONLY; then
+	debian_version=`cd "$extracted_dir" && dpkg-parsechangelog --count 1|grep-dctrl -nsVersion .`
+	debian_version_tag=`echo "$debian_version"|sed 's/:/_/g;s/~/_/g'`
+	if [ -z "$tag" ]; then
+		tag=$debian_version_tag
+	fi
+	if [ "`git tag -l "$tag"`" != "" ]; then
+		echo "Version $tag is already tagged." >&2
+		exit 1
+	fi
+	cat > "$tmpdir/commit_msg" <<EOT
+Import version $debian_version ($tag)
 
 Imported using git-dsc-commit.
 EOT
-cat > "$tmpdir/tag_msg" <<EOT
+	cat > "$tmpdir/tag_msg" <<EOT
 Tagged using git-dsc-commit.
 EOT
+fi
 GIT_WORK_TREE="$extracted_dir" git add -fA
 if [ "`GIT_WORK_TREE="$extracted_dir" git status --porcelain`" = "" ]; then
 	echo "No changes to import." >&2
 	exit 1
 fi
-git commit -qF "$tmpdir/commit_msg"
-git tag -a -F "$tmpdir/tag_msg" "$debian_version_tag"
-git reset --hard
-git clean -fxd
+if $TREEONLY; then
+	git write-tree
+else
+	git commit -qF "$tmpdir/commit_msg"
+	git tag -a -F "$tmpdir/tag_msg" "$tag"
+fi
+git reset --hard >/dev/null
+git clean -fxd >/dev/null
