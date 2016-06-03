@@ -8,7 +8,7 @@ xgit_enable() {
 	export GIT_DIR=$(readlink -f "$top/git")
 	export GIT_WORK_TREE=$(readlink -f "$top/gitwd")
 	export XGIT_OLD_PS1="$PS1"
-	export PS1=$(echo "$PS1"|perl -pe 's/(\\w\\\$)(\s*)$/(xgit \$XGIT_TOP)\1\2/')
+	export PS1=$(echo "$PS1"|perl -pe 's/(\s*)$/(xgit \$XGIT_TOP)\1\2/')
 }
 xgit_disable() {
 	unset GIT_DIR GIT_WORK_TREE XGIT_TOP
